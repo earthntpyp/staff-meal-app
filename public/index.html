@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>เมนูพนักงานวันนี้ 🍳 Staff Meal Randomizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #16130e;
+    --card: #211c14;
+    --card2: #2a2419;
+    --line: #3a3120;
+    --text: #f3ead9;
+    --muted: #a89a80;
+    --accent: #f5a623;
+    --accent2: #e8590c;
+    --green: #6fbf73;
+    --chip-chicken: #f5a623;
+    --chip-pork: #ef7a93;
+    --chip-beef: #c0553a;
+    --chip-other: #6fbf73;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Prompt', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(245,166,35,.12), transparent);
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 80px; }
+
+  header { text-align: center; padding: 24px 0 8px; }
+  header h1 { font-size: 2rem; font-weight: 800; }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--muted); margin-top: 6px; font-weight: 300; }
+
+  /* ===== Randomizer ===== */
+  .randomizer {
+    background: linear-gradient(145deg, var(--card2), var(--card));
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 28px 20px;
+    margin: 24px 0;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .randomizer h2 { font-size: 1.15rem; font-weight: 600; margin-bottom: 14px; }
+  .protein-picker { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 18px; }
+  .protein-btn {
+    font-family: inherit; font-size: 1rem; font-weight: 500;
+    padding: 10px 22px; border-radius: 999px; cursor: pointer;
+    background: var(--bg); color: var(--muted);
+    border: 2px solid var(--line);
+    transition: all .15s;
+  }
+  .protein-btn:hover { border-color: var(--accent); color: var(--text); }
+  .protein-btn.active { background: var(--accent); border-color: var(--accent); color: #1d1608; font-weight: 700; }
+
+  .slot {
+    height: 72px; display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; font-weight: 700; color: var(--accent);
+    margin: 8px 0 16px;
+    text-shadow: 0 0 30px rgba(245,166,35,.35);
+  }
+  .slot.spinning { color: var(--muted); text-shadow: none; }
+  .slot .placeholder { color: var(--muted); font-weight: 300; font-size: 1.05rem; }
+
+  .spin-btn {
+    font-family: inherit; font-size: 1.25rem; font-weight: 800;
+    padding: 16px 48px; border: none; border-radius: 999px; cursor: pointer;
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    box-shadow: 0 8px 24px rgba(232,89,12,.35);
+    transition: transform .1s, box-shadow .15s;
+  }
+  .spin-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(232,89,12,.45); }
+  .spin-btn:active { transform: translateY(1px); }
+  .spin-btn:disabled { opacity: .6; cursor: wait; transform: none; }
+  .slot-result-actions { margin-top: 10px; min-height: 30px; }
+  .view-recipe-link {
+    background: none; border: 1px solid var(--accent); color: var(--accent);
+    font-family: inherit; font-size: .95rem; padding: 6px 20px; border-radius: 999px; cursor: pointer;
+  }
+  .view-recipe-link:hover { background: rgba(245,166,35,.12); }
+
+  /* ===== Toolbar ===== */
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 26px 0 16px; }
+  .toolbar .filters { display: flex; flex-wrap: wrap; gap: 8px; flex: 1 1 100%; }
+  .toolbar .search { flex: 1; }
+  .chip {
+    font-family: inherit; font-size: .9rem; padding: 7px 16px; border-radius: 999px;
+    background: var(--card); color: var(--muted); border: 1px solid var(--line); cursor: pointer;
+    transition: all .15s;
+  }
+  .chip:hover { color: var(--text); border-color: var(--muted); }
+  .chip.active { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+  .search {
+    font-family: inherit; font-size: .95rem;
+    background: var(--card); color: var(--text);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 9px 18px; width: 220px; outline: none;
+  }
+  .search:focus { border-color: var(--accent); }
+  .add-btn {
+    font-family: inherit; font-size: .95rem; font-weight: 600;
+    background: var(--green); color: #10240f; border: none; border-radius: 999px;
+    padding: 10px 20px; cursor: pointer;
+  }
+  .add-btn:hover { filter: brightness(1.1); }
+
+  .count-note { color: var(--muted); font-size: .85rem; margin-bottom: 12px; font-weight: 300; }
+
+  /* ===== Grid ===== */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px; cursor: pointer; transition: transform .12s, border-color .15s;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .card:hover { transform: translateY(-3px); border-color: var(--accent); }
+  .card .badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .badge { font-size: .72rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+  .badge.region { background: rgba(243,234,217,.08); color: var(--muted); }
+  .badge.p-ไก่ { background: rgba(245,166,35,.15); color: var(--chip-chicken); }
+  .badge.p-หมู { background: rgba(239,122,147,.15); color: var(--chip-pork); }
+  .badge.p-เนื้อ { background: rgba(192,85,58,.2); color: #e08a6d; }
+  .badge.p-อื่นๆ { background: rgba(111,191,115,.15); color: var(--chip-other); }
+  .badge.community { background: rgba(111,191,115,.15); color: var(--green); }
+  .badge.d-ง่าย { background: rgba(111,191,115,.15); color: var(--green); }
+  .badge.d-ปานกลาง { background: rgba(245,166,35,.15); color: var(--accent); }
+  .badge.d-ยาก { background: rgba(230,90,90,.18); color: #ef8585; }
+  .slot-meta { color: var(--muted); font-size: .9rem; font-weight: 300; margin-top: 6px; }
+  .card h3 { font-size: 1.05rem; font-weight: 600; line-height: 1.35; }
+  .card .meta { color: var(--muted); font-size: .8rem; font-weight: 300; margin-top: auto; }
+
+  /* ===== Modal ===== */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.7); backdrop-filter: blur(4px);
+    display: none; align-items: flex-start; justify-content: center; z-index: 50;
+    padding: 40px 16px; overflow-y: auto;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--card2); border: 1px solid var(--line); border-radius: 20px;
+    max-width: 640px; width: 100%; padding: 28px;
+    animation: pop .18s ease-out;
+  }
+  @keyframes pop { from { transform: scale(.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .modal .badges { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .modal h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 4px; }
+  .modal .meta { color: var(--muted); font-size: .85rem; font-weight: 300; margin-bottom: 18px; }
+  .modal h4 { color: var(--accent); font-size: .95rem; font-weight: 600; margin: 18px 0 8px; text-transform: uppercase; letter-spacing: .5px; }
+  .modal ul, .modal ol { padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-weight: 300; line-height: 1.55; }
+  .modal ol li::marker { color: var(--accent); font-weight: 600; }
+  .modal .close-row { display: flex; justify-content: flex-end; margin-top: 22px; }
+  .btn-secondary {
+    font-family: inherit; font-size: .95rem; padding: 9px 24px; border-radius: 999px; cursor: pointer;
+    background: var(--card); color: var(--text); border: 1px solid var(--line);
+  }
+  .btn-secondary:hover { border-color: var(--muted); }
+
+  /* ===== Form ===== */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: 5px; }
+  input[type=text], input[type=number], select, textarea {
+    font-family: inherit; font-size: .95rem; width: 100%;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 96px; font-weight: 300; }
+  .hint { font-size: .75rem; color: var(--muted); font-weight: 300; margin-top: 3px; }
+  .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .btn-primary {
+    font-family: inherit; font-size: 1rem; font-weight: 700; padding: 11px 32px;
+    border: none; border-radius: 999px; cursor: pointer;
+    background: var(--green); color: #10240f;
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--green); color: #10240f; font-weight: 600;
+    padding: 12px 28px; border-radius: 999px; z-index: 99;
+    transition: transform .25s; box-shadow: 0 10px 30px rgba(0,0,0,.4);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  footer { text-align: center; color: var(--muted); font-size: .8rem; font-weight: 300; margin-top: 50px; }
+
+  @media (max-width: 560px) {
+    header h1 { font-size: 1.5rem; }
+    .slot { font-size: 1.15rem; }
+    .toolbar .search { flex: 1 1 100%; width: auto; }
+    .form-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🍳 เมนูพนักงาน<span>วันนี้</span></h1>
+    <p>ตัวช่วยหัวหน้าครัว — นึกเมนู staff meal ไม่ออก ให้เรากดสุ่มให้ · สัดส่วนโดยประมาณสำหรับ 5 คน</p>
+  </header>
+
+  <!-- Randomizer -->
+  <section class="randomizer">
+    <h2>🎰 วันนี้จะใช้โปรตีนอะไร? เลือกแล้วกดสุ่มเลย</h2>
+    <div class="protein-picker" id="proteinPicker">
+      <button class="protein-btn active" data-protein="ทั้งหมด">🎲 สุ่มทุกอย่าง</button>
+      <button class="protein-btn" data-protein="ไก่">🐔 ไก่</button>
+      <button class="protein-btn" data-protein="หมู">🐷 หมู</button>
+      <button class="protein-btn" data-protein="เนื้อ">🐮 เนื้อ</button>
+      <button class="protein-btn" data-protein="อื่นๆ">🥚 ไข่/ผัก</button>
+    </div>
+    <div class="slot" id="slot"><span class="placeholder">เมนูที่สุ่มได้จะโชว์ตรงนี้…</span></div>
+    <button class="spin-btn" id="spinBtn">สุ่มเมนู!</button>
+    <div class="slot-result-actions" id="slotActions"></div>
+  </section>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="filters" id="regionFilters">
+      <button class="chip active" data-region="ทั้งหมด">ทั้งหมด</button>
+      <button class="chip" data-region="กลาง">ไทยภาคกลาง</button>
+      <button class="chip" data-region="อีสาน">อีสาน</button>
+      <button class="chip" data-region="เหนือ">ภาคเหนือ</button>
+      <button class="chip" data-region="ไทย-ญี่ปุ่น">ไทย × ญี่ปุ่น</button>
+    </div>
+    <div class="filters" id="difficultyFilters">
+      <button class="chip active" data-difficulty="ทั้งหมด">ทุกระดับ</button>
+      <button class="chip" data-difficulty="ง่าย">🟢 ง่าย</button>
+      <button class="chip" data-difficulty="ปานกลาง">🟡 ปานกลาง</button>
+      <button class="chip" data-difficulty="ยาก">🔴 ยาก</button>
+    </div>
+    <input type="text" class="search" id="searchBox" placeholder="🔍 ค้นหาเมนู / วัตถุดิบ…">
+    <button class="add-btn" id="openAddBtn">＋ เพิ่มสูตรของฉัน</button>
+  </div>
+  <div class="count-note" id="countNote"></div>
+
+  <!-- Recipe grid -->
+  <div class="grid" id="grid"></div>
+
+  <footer>ทำด้วยใจเพื่อชาวครัว 👩‍🍳 — เพิ่มสูตรเด็ดของคุณเพื่อแชร์ให้ทีมได้เลย</footer>
+</div>
+
+<!-- Recipe detail modal -->
+<div class="modal-overlay" id="detailOverlay">
+  <div class="modal" id="detailModal"></div>
+</div>
+
+<!-- Add recipe modal -->
+<div class="modal-overlay" id="addOverlay">
+  <div class="modal">
+    <h2 style="margin-bottom:16px">＋ เพิ่มสูตรใหม่แชร์ให้ทีม</h2>
+    <form id="addForm">
+      <div class="form-grid">
+        <div class="full">
+          <label>ชื่อเมนู *</label>
+          <input type="text" name="name" required placeholder="เช่น ผัดพริกเกลือคอหมู">
+        </div>
+        <div>
+          <label>หมวด *</label>
+          <select name="region" required>
+            <option value="กลาง">ไทยภาคกลาง</option>
+            <option value="อีสาน">อีสาน</option>
+            <option value="เหนือ">ภาคเหนือ</option>
+            <option value="ไทย-ญี่ปุ่น">ไทย × ญี่ปุ่น</option>
+          </select>
+        </div>
+        <div>
+          <label>โปรตีนหลัก *</label>
+          <select name="protein" required>
+            <option value="ไก่">ไก่</option>
+            <option value="หมู">หมู</option>
+            <option value="เนื้อ">เนื้อ</option>
+            <option value="อื่นๆ">ไข่ / เต้าหู้ / ผัก / อื่นๆ</option>
+          </select>
+        </div>
+        <div>
+          <label>ระดับความยาก *</label>
+          <select name="difficulty" required>
+            <option value="ง่าย">🟢 ง่าย</option>
+            <option value="ปานกลาง" selected>🟡 ปานกลาง</option>
+            <option value="ยาก">🔴 ยาก</option>
+          </select>
+        </div>
+        <div>
+          <label>เวลาทำ (นาที)</label>
+          <input type="number" name="time" min="1" placeholder="30">
+        </div>
+        <div>
+          <label>ชื่อคนแชร์สูตร</label>
+          <input type="text" name="author" placeholder="เช่น เชฟโอ๊ต">
+        </div>
+        <div class="full">
+          <label>วัตถุดิบ * <span class="hint">(1 บรรทัด = 1 อย่าง)</span></label>
+          <textarea name="ingredients" required placeholder="หมูสับ 500 ก.&#10;กระเทียม 10 กลีบ&#10;น้ำปลา 2 ชต."></textarea>
+        </div>
+        <div class="full">
+          <label>วิธีทำ * <span class="hint">(1 บรรทัด = 1 ขั้นตอน)</span></label>
+          <textarea name="steps" required placeholder="ผัดกระเทียมจนหอม&#10;ใส่หมูสับผัดจนสุก&#10;ปรุงรสแล้วเสิร์ฟ"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" id="cancelAddBtn">ยกเลิก</button>
+        <button type="submit" class="btn-primary">บันทึกสูตร</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="recipes.js"></script>
+<script>
+const REGION_LABEL = { "กลาง": "ไทยภาคกลาง", "อีสาน": "อีสาน", "เหนือ": "ภาคเหนือ", "ไทย-ญี่ปุ่น": "ไทย × ญี่ปุ่น" };
+const PROTEIN_EMOJI = { "ไก่": "🐔", "หมู": "🐷", "เนื้อ": "🐮", "อื่นๆ": "🥚" };
+const DIFFICULTY_EMOJI = { "ง่าย": "🟢", "ปานกลาง": "🟡", "ยาก": "🔴" };
+
+let communityRecipes = [];
+let allRecipes = [...BASE_RECIPES];
+let activeProtein = "ทั้งหมด";
+let activeRegion = "ทั้งหมด";
+let activeDifficulty = "ทั้งหมด";
+let searchTerm = "";
+let serverOnline = false;
+
+const grid = document.getElementById("grid");
+const slot = document.getElementById("slot");
+const slotActions = document.getElementById("slotActions");
+const countNote = document.getElementById("countNote");
+
+// ---------- Load community recipes (server first, localStorage fallback) ----------
+async function loadCommunity() {
+  try {
+    const res = await fetch("/api/recipes");
+    if (!res.ok) throw new Error();
+    communityRecipes = await res.json();
+    serverOnline = true;
+  } catch {
+    communityRecipes = JSON.parse(localStorage.getItem("communityRecipes") || "[]");
+    serverOnline = false;
+  }
+  rebuild();
+}
+
+function rebuild() {
+  allRecipes = [...BASE_RECIPES, ...communityRecipes.map(r => ({ ...r, community: true }))];
+  render();
+}
+
+// ---------- Render ----------
+function filtered() {
+  return allRecipes.filter(r => {
+    if (activeRegion !== "ทั้งหมด" && r.region !== activeRegion) return false;
+    if (activeDifficulty !== "ทั้งหมด" && r.difficulty !== activeDifficulty) return false;
+    if (searchTerm) {
+      const hay = (r.name + " " + r.ingredients.join(" ")).toLowerCase();
+      if (!hay.includes(searchTerm)) return false;
+    }
+    return true;
+  });
+}
+
+function render() {
+  const list = filtered();
+  countNote.textContent = `ทั้งหมด ${allRecipes.length} เมนู · แสดง ${list.length} เมนู` + (serverOnline ? "" : " · โหมดออฟไลน์ (สูตรใหม่เก็บในเครื่องนี้)");
+  grid.innerHTML = list.map(r => `
+    <div class="card" data-id="${r.id}" data-community="${r.community ? 1 : 0}">
+      <div class="badges">
+        <span class="badge p-${r.protein}">${PROTEIN_EMOJI[r.protein] || ""} ${r.protein}</span>
+        <span class="badge region">${REGION_LABEL[r.region] || r.region}</span>
+        ${r.difficulty ? `<span class="badge d-${r.difficulty}">${DIFFICULTY_EMOJI[r.difficulty] || ""} ${r.difficulty}</span>` : ""}
+        ${r.community ? '<span class="badge community">⭐ สูตรจากทีม</span>' : ""}
+      </div>
+      <h3>${escapeHtml(r.name)}</h3>
+      <div class="meta">⏱ ~${r.time || "?"} นาที · วัตถุดิบ ${r.ingredients.length} อย่าง${r.author ? " · โดย " + escapeHtml(r.author) : ""}</div>
+    </div>
+  `).join("");
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// ---------- Detail modal ----------
+const detailOverlay = document.getElementById("detailOverlay");
+const detailModal = document.getElementById("detailModal");
+
+function openDetail(recipe) {
+  detailModal.innerHTML = `
+    <div class="badges">
+      <span class="badge p-${recipe.protein}">${PROTEIN_EMOJI[recipe.protein] || ""} ${recipe.protein}</span>
+      <span class="badge region">${REGION_LABEL[recipe.region] || recipe.region}</span>
+      ${recipe.difficulty ? `<span class="badge d-${recipe.difficulty}">${DIFFICULTY_EMOJI[recipe.difficulty] || ""} ระดับ${recipe.difficulty}</span>` : ""}
+      ${recipe.community ? '<span class="badge community">⭐ สูตรจากทีม</span>' : ""}
+    </div>
+    <h2>${escapeHtml(recipe.name)}</h2>
+    <div class="meta">⏱ เวลาปรุงประมาณ ${recipe.time || "?"} นาที · สัดส่วน ~5 คน${recipe.author ? " · แชร์โดย " + escapeHtml(recipe.author) : ""}</div>
+    <h4>🧺 วัตถุดิบ</h4>
+    <ul>${recipe.ingredients.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>
+    <h4>👨‍🍳 วิธีทำ</h4>
+    <ol>${recipe.steps.map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
+    <div class="close-row"><button class="btn-secondary" onclick="closeDetail()">ปิด</button></div>
+  `;
+  detailOverlay.classList.add("open");
+}
+function closeDetail() { detailOverlay.classList.remove("open"); }
+detailOverlay.addEventListener("click", e => { if (e.target === detailOverlay) closeDetail(); });
+
+grid.addEventListener("click", e => {
+  const card = e.target.closest(".card");
+  if (!card) return;
+  const r = allRecipes.find(x => String(x.id) === card.dataset.id && Boolean(x.community) === (card.dataset.community === "1"));
+  if (r) openDetail(r);
+});
+
+// ---------- Protein picker + randomizer ----------
+document.getElementById("proteinPicker").addEventListener("click", e => {
+  const btn = e.target.closest(".protein-btn");
+  if (!btn) return;
+  document.querySelectorAll(".protein-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  activeProtein = btn.dataset.protein;
+});
+
+const spinBtn = document.getElementById("spinBtn");
+spinBtn.addEventListener("click", () => {
+  const pool = allRecipes.filter(r => activeProtein === "ทั้งหมด" || r.protein === activeProtein);
+  if (!pool.length) { slot.innerHTML = '<span class="placeholder">ยังไม่มีเมนูในหมวดนี้</span>'; return; }
+
+  spinBtn.disabled = true;
+  slotActions.innerHTML = "";
+  slot.classList.add("spinning");
+
+  const duration = 2500; // จับเวลาจริง กัน browser หน่วง timer แล้วหมุนค้าง
+  const start = Date.now();
+  function tick() {
+    const elapsed = Date.now() - start;
+    const r = pool[Math.floor(Math.random() * pool.length)];
+    slot.textContent = r.name;
+    if (elapsed < duration) {
+      // ค่อยๆ ช้าลงเหมือน slot machine
+      setTimeout(tick, 40 + Math.pow(elapsed / duration, 2) * 300);
+    } else {
+      const winner = pool[Math.floor(Math.random() * pool.length)];
+      slot.classList.remove("spinning");
+      slot.textContent = "🎉 " + winner.name;
+      slotActions.innerHTML = `
+        <div class="slot-meta">⏱ ~${winner.time || "?"} นาที · ${DIFFICULTY_EMOJI[winner.difficulty] || ""} ระดับ${winner.difficulty || "ปานกลาง"} · ${REGION_LABEL[winner.region] || winner.region}</div>
+        <button class="view-recipe-link" id="viewWinner">ดูสูตร + วัตถุดิบ</button>`;
+      document.getElementById("viewWinner").onclick = () => openDetail(winner);
+      spinBtn.disabled = false;
+    }
+  }
+  tick();
+});
+
+// ---------- Region filters + search ----------
+document.getElementById("regionFilters").addEventListener("click", e => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  document.querySelectorAll("#regionFilters .chip").forEach(c => c.classList.remove("active"));
+  chip.classList.add("active");
+  activeRegion = chip.dataset.region;
+  render();
+});
+
+document.getElementById("difficultyFilters").addEventListener("click", e => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  document.querySelectorAll("#difficultyFilters .chip").forEach(c => c.classList.remove("active"));
+  chip.classList.add("active");
+  activeDifficulty = chip.dataset.difficulty;
+  render();
+});
+
+document.getElementById("searchBox").addEventListener("input", e => {
+  searchTerm = e.target.value.trim().toLowerCase();
+  render();
+});
+
+// ---------- Add recipe ----------
+const addOverlay = document.getElementById("addOverlay");
+document.getElementById("openAddBtn").onclick = () => addOverlay.classList.add("open");
+document.getElementById("cancelAddBtn").onclick = () => addOverlay.classList.remove("open");
+addOverlay.addEventListener("click", e => { if (e.target === addOverlay) addOverlay.classList.remove("open"); });
+
+document.getElementById("addForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const recipe = {
+    id: "c" + Date.now(),
+    name: fd.get("name").trim(),
+    region: fd.get("region"),
+    protein: fd.get("protein"),
+    difficulty: fd.get("difficulty") || "ปานกลาง",
+    time: parseInt(fd.get("time")) || null,
+    author: (fd.get("author") || "").trim(),
+    ingredients: fd.get("ingredients").split("\n").map(s => s.trim()).filter(Boolean),
+    steps: fd.get("steps").split("\n").map(s => s.trim()).filter(Boolean),
+    createdAt: new Date().toISOString()
+  };
+  if (!recipe.name || !recipe.ingredients.length || !recipe.steps.length) return;
+
+  let saved = false;
+  try {
+    const res = await fetch("/api/recipes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(recipe)
+    });
+    saved = res.ok;
+  } catch { /* server offline */ }
+
+  if (!saved) {
+    const local = JSON.parse(localStorage.getItem("communityRecipes") || "[]");
+    local.push(recipe);
+    localStorage.setItem("communityRecipes", JSON.stringify(local));
+  }
+
+  communityRecipes.push(recipe);
+  rebuild();
+  addOverlay.classList.remove("open");
+  e.target.reset();
+  showToast("บันทึกสูตร “" + recipe.name + "” เรียบร้อย 🎉");
+});
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+loadCommunity();
+</script>
+</body>
+</html>

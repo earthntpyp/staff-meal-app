@@ -1,0 +1,1 @@
+# ใช้ Python standard library ล้วน — ไฟล์นี้มีไว้ให้ Railway/Nixpacks ตรวจจับว่าเป็นแอป Python
