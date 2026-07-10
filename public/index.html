@@ -232,6 +232,8 @@
       <button class="chip" data-region="อีสาน">อีสาน</button>
       <button class="chip" data-region="เหนือ">ภาคเหนือ</button>
       <button class="chip" data-region="ไทย-ญี่ปุ่น">ไทย × ญี่ปุ่น</button>
+      <button class="chip" data-region="น้ำพริก">🌶 น้ำพริก & เครื่องแกง</button>
+      <button class="chip" data-region="ฝรั่ง">🍝 ฝรั่งง่ายๆ</button>
     </div>
     <div class="filters" id="difficultyFilters">
       <button class="chip active" data-difficulty="ทั้งหมด">ทุกระดับ</button>
@@ -272,6 +274,8 @@
             <option value="อีสาน">อีสาน</option>
             <option value="เหนือ">ภาคเหนือ</option>
             <option value="ไทย-ญี่ปุ่น">ไทย × ญี่ปุ่น</option>
+            <option value="น้ำพริก">น้ำพริก & เครื่องแกง</option>
+            <option value="ฝรั่ง">ฝรั่งง่ายๆ</option>
           </select>
         </div>
         <div>
@@ -320,7 +324,7 @@
 
 <script src="recipes.js"></script>
 <script>
-const REGION_LABEL = { "กลาง": "ไทยภาคกลาง", "อีสาน": "อีสาน", "เหนือ": "ภาคเหนือ", "ไทย-ญี่ปุ่น": "ไทย × ญี่ปุ่น" };
+const REGION_LABEL = { "กลาง": "ไทยภาคกลาง", "อีสาน": "อีสาน", "เหนือ": "ภาคเหนือ", "ไทย-ญี่ปุ่น": "ไทย × ญี่ปุ่น", "น้ำพริก": "น้ำพริก & เครื่องแกง", "ฝรั่ง": "ฝรั่งง่ายๆ" };
 const PROTEIN_EMOJI = { "ไก่": "🐔", "หมู": "🐷", "เนื้อ": "🐮", "อื่นๆ": "🥚" };
 const DIFFICULTY_EMOJI = { "ง่าย": "🟢", "ปานกลาง": "🟡", "ยาก": "🔴" };
 
@@ -433,7 +437,8 @@ document.getElementById("proteinPicker").addEventListener("click", e => {
 
 const spinBtn = document.getElementById("spinBtn");
 spinBtn.addEventListener("click", () => {
-  const pool = allRecipes.filter(r => activeProtein === "ทั้งหมด" || r.protein === activeProtein);
+  // พริกแกง (paste) เป็นสูตรพื้นฐาน ไม่ใช่มื้ออาหาร — ไม่เข้าระบบสุ่ม
+  const pool = allRecipes.filter(r => !r.paste && (activeProtein === "ทั้งหมด" || r.protein === activeProtein));
   if (!pool.length) { slot.innerHTML = '<span class="placeholder">ยังไม่มีเมนูในหมวดนี้</span>'; return; }
 
   spinBtn.disabled = true;
