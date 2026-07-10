@@ -170,6 +170,15 @@
   .modal ul, .modal ol { padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-weight: 300; line-height: 1.55; }
   .modal ol li::marker { color: var(--accent); font-weight: 600; }
   .modal .close-row { display: flex; justify-content: flex-end; margin-top: 22px; }
+  .portion-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 6px; font-size: .95rem; }
+  .portion-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text);
+    font-size: 1.15rem; font-family: inherit; cursor: pointer; line-height: 1;
+  }
+  .portion-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .portion-num { font-size: 1.25rem; font-weight: 700; color: var(--accent); min-width: 2ch; text-align: center; }
+  .portion-hint { color: var(--muted); font-size: .75rem; font-weight: 300; flex-basis: 100%; }
   .paste-link {
     font-family: inherit; font-size: .78rem; font-weight: 500;
     background: rgba(245,166,35,.12); color: var(--accent);
@@ -228,7 +237,7 @@
 <div class="wrap">
   <header>
     <h1>🍳 Gin-Rai-Dee <span>กินไรดี??</span></h1>
-    <p>ตัวช่วยหัวหน้าครัว — นึกเมนู staff meal ไม่ออก ให้เรากดสุ่มให้ · สัดส่วนโดยประมาณสำหรับ 5 คน</p>
+    <p>ตัวช่วยหัวหน้าครัว — นึกเมนู staff meal ไม่ออก ให้เรากดสุ่มให้ · ปรับปริมาณตามจำนวนคนได้ในหน้าสูตร</p>
   </header>
 
   <!-- Randomizer -->
@@ -377,6 +386,36 @@ function pasteFor(ingredient) {
   return hit ? BASE_RECIPES.find(r => r.id === hit.id) : null;
 }
 
+// ---------- Portion scaling: สูตรต้นฉบับ = 5 คน ----------
+const BASE_SERVINGS = 5;
+let servings = parseInt(localStorage.getItem("servings")) || BASE_SERVINGS;
+let currentRecipe = null;
+
+const FRACTION_LABEL = { "0.25": "1/4", "0.5": "1/2", "0.75": "3/4" };
+// หน่วยที่นับเป็นชิ้น — ปัดจำนวนเต็มเสมอ (ไข่ 4.75 ฟองไม่มีในครัวจริง)
+const COUNT_UNITS = /^\s*(ฟอง|ลูก|หัว|เม็ด|กลีบ|ตัว|ชิ้น|ต้น|ราก|หลอด|ก้อน|แผ่น|คู่|ดอก|กำ|แว่น|กล่อง|ท่อน|นิ้ว|แท่ง)/;
+
+function fmtNum(v, isCount) {
+  if (isCount || v >= 10) return String(Math.max(1, Math.round(v)));
+  const r = Math.max(0.25, Math.round(v * 4) / 4); // ปัดเป็นสเต็ป 1/4
+  const whole = Math.floor(r), frac = FRACTION_LABEL[String(r - whole)];
+  if (!frac) return String(r);
+  return whole ? `${whole} ${frac}` : frac;
+}
+
+function scaleIngredient(text, factor) {
+  if (factor === 1) return text;
+  return text.replace(/(\d+(?:\.\d+)?(?:\/\d+)?)((?:\s*-\s*)(\d+(?:\.\d+)?(?:\/\d+)?))?/g,
+    (m, a, _range, b, offset) => {
+      if (offset > 0 && text[offset - 1] === "~") return m; // ขนาดต่อชิ้น เช่น (ชิ้นละ ~150 ก.) ไม่ต้องคูณ
+      const after = text.slice(offset + m.length);
+      const isCount = COUNT_UNITS.test(after);
+      const toNum = s => s.includes("/") ? (+s.split("/")[0]) / (+s.split("/")[1]) : parseFloat(s);
+      const scaled = s => fmtNum(toNum(s) * factor, isCount);
+      return b ? `${scaled(a)}-${scaled(b)}` : scaled(a);
+    });
+}
+
 let communityRecipes = [];
 let allRecipes = [...BASE_RECIPES];
 let activeProtein = "ทั้งหมด";
@@ -448,7 +487,27 @@ function escapeHtml(s) {
 const detailOverlay = document.getElementById("detailOverlay");
 const detailModal = document.getElementById("detailModal");
 
+function ingredientItems(recipe) {
+  const factor = servings / BASE_SERVINGS;
+  return recipe.ingredients.map(i => {
+    const p = pasteFor(i);
+    const link = p && p.id !== recipe.id
+      ? ` <button class="paste-link" data-open-id="${p.id}">🌶 สูตรโขลกเอง →</button>` : "";
+    return `<li>${escapeHtml(scaleIngredient(i, factor))}${link}</li>`;
+  }).join("");
+}
+
+function changeServings(d) {
+  servings = Math.min(50, Math.max(1, servings + d));
+  localStorage.setItem("servings", servings);
+  const num = document.getElementById("portionNum");
+  if (num) num.textContent = servings;
+  const list = document.getElementById("ingList");
+  if (list && currentRecipe) list.innerHTML = ingredientItems(currentRecipe);
+}
+
 function openDetail(recipe) {
+  currentRecipe = recipe;
   detailModal.innerHTML = `
     <div class="badges">
       <span class="badge p-${recipe.protein}">${PROTEIN_EMOJI[recipe.protein] || ""} ${recipe.protein}</span>
@@ -457,14 +516,16 @@ function openDetail(recipe) {
       ${recipe.community ? '<span class="badge community">⭐ สูตรจากทีม</span>' : ""}
     </div>
     <h2>${escapeHtml(recipe.name)}</h2>
-    <div class="meta">⏱ เวลาปรุงประมาณ ${recipe.time || "?"} นาที · สัดส่วน ~5 คน${recipe.author ? " · แชร์โดย " + escapeHtml(recipe.author) : ""}</div>
+    <div class="meta">⏱ เวลาปรุงประมาณ ${recipe.time || "?"} นาที${recipe.author ? " · แชร์โดย " + escapeHtml(recipe.author) : ""}</div>
+    <div class="portion-row">
+      <span>👥 จำนวนคน</span>
+      <button class="portion-btn" data-d="-1">−</button>
+      <span class="portion-num" id="portionNum">${servings}</span>
+      <button class="portion-btn" data-d="1">＋</button>
+      <span class="portion-hint">ปริมาณวัตถุดิบปรับให้อัตโนมัติ (ต้นฉบับ ~${BASE_SERVINGS} คน)</span>
+    </div>
     <h4>🧺 วัตถุดิบ</h4>
-    <ul>${recipe.ingredients.map(i => {
-      const p = pasteFor(i);
-      const link = p && p.id !== recipe.id
-        ? ` <button class="paste-link" data-open-id="${p.id}">🌶 สูตรโขลกเอง →</button>` : "";
-      return `<li>${escapeHtml(i)}${link}</li>`;
-    }).join("")}</ul>
+    <ul id="ingList">${ingredientItems(recipe)}</ul>
     <h4>👨‍🍳 วิธีทำ</h4>
     <ol>${recipe.steps.map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
     ${renderUsedIn(recipe)}
@@ -490,6 +551,8 @@ detailOverlay.addEventListener("click", e => { if (e.target === detailOverlay) c
 
 // กดลิงก์ในหน้าสูตร → เปิดสูตรที่เกี่ยวข้องแทนที่ (พริกแกง ↔ เมนูที่ใช้)
 detailModal.addEventListener("click", e => {
+  const pbtn = e.target.closest(".portion-btn");
+  if (pbtn) { changeServings(+pbtn.dataset.d); return; }
   const btn = e.target.closest("[data-open-id]");
   if (!btn) return;
   const wantCommunity = btn.dataset.openCommunity === "1";
