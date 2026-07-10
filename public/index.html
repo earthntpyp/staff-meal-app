@@ -87,8 +87,21 @@
   }
   .view-recipe-link:hover { background: rgba(245,166,35,.12); }
 
+  /* ===== Browse toggle ===== */
+  .browse-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 26px 0 10px; }
+  .toggle-browse {
+    flex: 1; min-width: 220px;
+    font-family: inherit; font-size: 1rem; font-weight: 600;
+    padding: 13px 20px; border-radius: 14px; cursor: pointer;
+    background: var(--card); color: var(--text);
+    border: 1px dashed var(--line);
+    transition: all .15s; text-align: center;
+  }
+  .toggle-browse:hover { border-color: var(--accent); color: var(--accent); }
+  .toggle-browse.open { border-style: solid; border-color: var(--accent); color: var(--accent); background: rgba(245,166,35,.07); }
+
   /* ===== Toolbar ===== */
-  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 26px 0 16px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0 16px; }
   .toolbar .filters { display: flex; flex-wrap: wrap; gap: 8px; flex: 1 1 100%; }
   .toolbar .search { flex: 1; }
   .chip {
@@ -233,6 +246,13 @@
     <div class="slot-result-actions" id="slotActions"></div>
   </section>
 
+  <!-- Browse toggle: รายการเมนูซ่อนไว้ กดเปิดเมื่อต้องการ -->
+  <div class="browse-row">
+    <button class="toggle-browse" id="toggleBrowse">📖 ดูเมนูทั้งหมด ▼</button>
+    <button class="add-btn" id="openAddBtn">＋ เพิ่มสูตรของฉัน</button>
+  </div>
+
+  <div id="browseSection" hidden>
   <!-- Toolbar -->
   <div class="toolbar">
     <div class="filters" id="regionFilters">
@@ -251,12 +271,12 @@
       <button class="chip" data-difficulty="ยาก">🔴 ยาก</button>
     </div>
     <input type="text" class="search" id="searchBox" placeholder="🔍 ค้นหาเมนู / วัตถุดิบ…">
-    <button class="add-btn" id="openAddBtn">＋ เพิ่มสูตรของฉัน</button>
   </div>
   <div class="count-note" id="countNote"></div>
 
   <!-- Recipe grid -->
   <div class="grid" id="grid"></div>
+  </div><!-- /browseSection -->
 
   <footer>ทำด้วยใจเพื่อชาวครัว 👩‍🍳 — เพิ่มสูตรเด็ดของคุณเพื่อแชร์ให้ทีมได้เลย</footer>
 </div>
@@ -417,6 +437,7 @@ function render() {
       <div class="meta">⏱ ~${r.time || "?"} นาที · วัตถุดิบ ${r.ingredients.length} อย่าง${r.author ? " · โดย " + escapeHtml(r.author) : ""}</div>
     </div>
   `).join("");
+  updateBrowseLabel();
 }
 
 function escapeHtml(s) {
@@ -524,6 +545,27 @@ spinBtn.addEventListener("click", () => {
   }
   tick();
 });
+
+// ---------- Browse section toggle (ซ่อนรายการเมนูให้หน้าแรกโล่ง) ----------
+const browseSection = document.getElementById("browseSection");
+const toggleBrowse = document.getElementById("toggleBrowse");
+
+function updateBrowseLabel() {
+  toggleBrowse.textContent = browseSection.hidden
+    ? `📖 ดูเมนูทั้งหมด (${allRecipes.length} เมนู) ▼`
+    : "▲ ซ่อนรายการเมนู";
+  toggleBrowse.classList.toggle("open", !browseSection.hidden);
+}
+
+toggleBrowse.addEventListener("click", () => {
+  browseSection.hidden = !browseSection.hidden;
+  localStorage.setItem("browseOpen", browseSection.hidden ? "0" : "1");
+  updateBrowseLabel();
+  if (!browseSection.hidden) browseSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
+});
+
+// จำสถานะครั้งก่อนของเครื่องนี้ (ค่าเริ่มต้น: ซ่อน)
+if (localStorage.getItem("browseOpen") === "1") browseSection.hidden = false;
 
 // ---------- Region filters + search ----------
 document.getElementById("regionFilters").addEventListener("click", e => {
