@@ -2,6 +2,7 @@
 # รัน: python3 server.py  แล้วให้ทีมเข้า http://<ไอพีเครื่องนี้>:3939
 import json
 import os
+import re
 import time
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
@@ -74,6 +75,62 @@ class Handler(SimpleHTTPRequestHandler):
             recipes.append(recipe)
             write_community(recipes)
             self._send_json(201, recipe)
+        except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+            self._send_json(400, {"error": "รูปแบบสูตรไม่ถูกต้อง"})
+
+    def _recipe_id_from_path(self):
+        m = re.match(r"^/api/recipes/([\w.-]+)$", self.path.split("?")[0])
+        return m.group(1) if m else None
+
+    def _sanitize(self, raw, keep=None):
+        keep = keep or {}
+        return {
+            "id": keep.get("id") or str(raw.get("id") or f"c{int(time.time() * 1000)}"),
+            "name": str(raw["name"])[:200],
+            "region": str(raw.get("region", "กลาง"))[:50],
+            "protein": str(raw.get("protein", "อื่นๆ"))[:50],
+            "difficulty": str(raw.get("difficulty", "ปานกลาง"))[:20],
+            "time": raw.get("time") if isinstance(raw.get("time"), (int, float)) else None,
+            "author": str(raw.get("author", ""))[:100],
+            "ingredients": [str(i)[:300] for i in raw["ingredients"][:50]],
+            "steps": [str(s)[:500] for s in raw["steps"][:30]],
+            "createdAt": keep.get("createdAt") or time.strftime("%Y-%m-%dT%H:%M:%S"),
+        }
+
+    def do_DELETE(self):
+        rid = self._recipe_id_from_path()
+        if not rid:
+            self.send_error(404)
+            return
+        recipes = read_community()
+        remaining = [r for r in recipes if str(r.get("id")) != rid]
+        if len(remaining) == len(recipes):
+            self._send_json(404, {"error": "ไม่พบสูตรนี้"})
+            return
+        write_community(remaining)
+        self._send_json(200, {"ok": True})
+
+    def do_PUT(self):
+        rid = self._recipe_id_from_path()
+        if not rid:
+            self.send_error(404)
+            return
+        try:
+            length = min(int(self.headers.get("Content-Length", 0)), 100_000)
+            raw = json.loads(self.rfile.read(length).decode("utf-8"))
+            if not raw.get("name") or not isinstance(raw.get("ingredients"), list) \
+                    or not isinstance(raw.get("steps"), list):
+                raise ValueError("invalid recipe")
+            recipes = read_community()
+            for idx, r in enumerate(recipes):
+                if str(r.get("id")) == rid:
+                    updated = self._sanitize(raw, keep={"id": rid, "createdAt": r.get("createdAt")})
+                    updated["updatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+                    recipes[idx] = updated
+                    write_community(recipes)
+                    self._send_json(200, updated)
+                    return
+            self._send_json(404, {"error": "ไม่พบสูตรนี้"})
         except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
             self._send_json(400, {"error": "รูปแบบสูตรไม่ถูกต้อง"})
 

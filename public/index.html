@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gin-Rai-Dee 🍳 กินไรดี?? — Staff Meal Randomizer</title>
+<meta name="theme-color" content="#16130e">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GinRaiDee">
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -143,6 +149,10 @@
   .badge.p-เนื้อ { background: rgba(192,85,58,.2); color: #e08a6d; }
   .badge.p-อื่นๆ { background: rgba(111,191,115,.15); color: var(--chip-other); }
   .badge.community { background: rgba(111,191,115,.15); color: var(--green); }
+  .badge.match { background: rgba(111,191,115,.18); color: var(--green); font-weight: 700; }
+  .pantry-input { width: 100%; margin-bottom: 10px; }
+  .btn-secondary.danger { color: #ef8585; border-color: rgba(230,90,90,.5); }
+  .btn-secondary.danger:hover { background: rgba(230,90,90,.12); }
   .badge.d-ง่าย { background: rgba(111,191,115,.15); color: var(--green); }
   .badge.d-ปานกลาง { background: rgba(245,166,35,.15); color: var(--accent); }
   .badge.d-ยาก { background: rgba(230,90,90,.18); color: #ef8585; }
@@ -255,6 +265,17 @@
     <div class="slot-result-actions" id="slotActions"></div>
   </section>
 
+  <!-- Pantry mode: หาเมนูจากวัตถุดิบที่มีในครัว -->
+  <div class="browse-row">
+    <button class="toggle-browse" id="togglePantry">🧊 ในครัวมีอะไร? หาเมนูจากวัตถุดิบ ▼</button>
+  </div>
+  <div id="pantrySection" hidden>
+    <input type="text" class="search pantry-input" id="pantryInput"
+      placeholder="พิมพ์วัตถุดิบที่มี คั่นด้วยเว้นวรรค เช่น  หมูสับ กะทิ ผักบุ้ง">
+    <div class="count-note" id="pantryNote">พิมพ์วัตถุดิบอย่างน้อย 1 อย่าง ระบบจะหาเมนูที่ใช้ของพวกนั้นให้ เรียงจากตรงมากไปน้อย</div>
+    <div class="grid" id="pantryGrid"></div>
+  </div>
+
   <!-- Browse toggle: รายการเมนูซ่อนไว้ กดเปิดเมื่อต้องการ -->
   <div class="browse-row">
     <button class="toggle-browse" id="toggleBrowse">📖 ดูเมนูทั้งหมด ▼</button>
@@ -299,7 +320,7 @@
 <!-- Add recipe modal -->
 <div class="modal-overlay" id="addOverlay">
   <div class="modal">
-    <h2 style="margin-bottom:16px">＋ เพิ่มสูตรใหม่แชร์ให้ทีม</h2>
+    <h2 style="margin-bottom:16px" id="addFormTitle">＋ เพิ่มสูตรใหม่แชร์ให้ทีม</h2>
     <form id="addForm">
       <div class="form-grid">
         <div class="full">
@@ -538,8 +559,17 @@ function openDetail(recipe) {
     <h4>👨‍🍳 วิธีทำ</h4>
     <ol>${recipe.steps.map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
     ${renderUsedIn(recipe)}
-    <div class="close-row"><button class="btn-secondary" onclick="closeDetail()">ปิด</button></div>
+    <div class="close-row">
+      ${recipe.community ? `
+        <button class="btn-secondary" id="editRecipeBtn">✏️ แก้ไข</button>
+        <button class="btn-secondary danger" id="deleteRecipeBtn">🗑 ลบ</button>` : ""}
+      <button class="btn-secondary" onclick="closeDetail()">ปิด</button>
+    </div>
   `;
+  if (recipe.community) {
+    document.getElementById("editRecipeBtn").onclick = () => startEditRecipe(recipe);
+    document.getElementById("deleteRecipeBtn").onclick = () => deleteRecipe(recipe);
+  }
   detailOverlay.classList.add("open");
 }
 // สำหรับหน้าพริกแกง: รวมเมนูที่ใช้เครื่องแกงนี้ (ลิงก์ย้อนกลับ)
@@ -640,6 +670,69 @@ toggleBrowse.addEventListener("click", () => {
 // จำสถานะครั้งก่อนของเครื่องนี้ (ค่าเริ่มต้น: ซ่อน)
 if (localStorage.getItem("browseOpen") === "1") browseSection.hidden = false;
 
+// ---------- Pantry mode: หาเมนูจากวัตถุดิบที่มี ----------
+const pantrySection = document.getElementById("pantrySection");
+const togglePantry = document.getElementById("togglePantry");
+const pantryGrid = document.getElementById("pantryGrid");
+const pantryNote = document.getElementById("pantryNote");
+
+togglePantry.addEventListener("click", () => {
+  pantrySection.hidden = !pantrySection.hidden;
+  togglePantry.classList.toggle("open", !pantrySection.hidden);
+  togglePantry.textContent = pantrySection.hidden
+    ? "🧊 ในครัวมีอะไร? หาเมนูจากวัตถุดิบ ▼"
+    : "▲ ซ่อนการค้นหาจากวัตถุดิบ";
+  if (!pantrySection.hidden) document.getElementById("pantryInput").focus();
+});
+
+function pantrySearch(q) {
+  const tokens = [...new Set(q.split(/[,\s]+/).map(t => t.trim()).filter(t => t.length >= 2))];
+  if (!tokens.length) return { tokens, results: [] };
+  const results = allRecipes
+    .map(r => {
+      const hay = r.name + " " + r.ingredients.join(" ");
+      const hits = tokens.filter(t => hay.includes(t));
+      return { r, hits };
+    })
+    .filter(x => x.hits.length > 0)
+    .sort((a, b) => b.hits.length - a.hits.length || (a.r.time || 99) - (b.r.time || 99))
+    .slice(0, 12);
+  return { tokens, results };
+}
+
+document.getElementById("pantryInput").addEventListener("input", e => {
+  const { tokens, results } = pantrySearch(e.target.value);
+  if (!tokens.length) {
+    pantryNote.textContent = "พิมพ์วัตถุดิบอย่างน้อย 1 อย่าง ระบบจะหาเมนูที่ใช้ของพวกนั้นให้ เรียงจากตรงมากไปน้อย";
+    pantryGrid.innerHTML = "";
+    return;
+  }
+  pantryNote.textContent = results.length
+    ? `เจอ ${results.length} เมนูที่ใช้วัตถุดิบของคุณ (เรียงจากใช้ครบที่สุด)`
+    : "ยังไม่เจอเมนูที่เข้ากับวัตถุดิบนี้ ลองสะกดแบบอื่นหรือลดคำดู";
+  pantryGrid.innerHTML = results.map(({ r, hits }) => `
+    <div class="card" data-id="${r.id}" data-community="${r.community ? 1 : 0}">
+      <div class="badges">
+        <span class="badge match">✔ ตรง ${hits.length}/${tokens.length}: ${hits.map(escapeHtml).join(", ")}</span>
+      </div>
+      <div class="badges">
+        <span class="badge p-${r.protein}">${PROTEIN_EMOJI[r.protein] || ""} ${r.protein}</span>
+        <span class="badge region">${REGION_LABEL[r.region] || r.region}</span>
+        ${r.difficulty ? `<span class="badge d-${r.difficulty}">${DIFFICULTY_EMOJI[r.difficulty] || ""} ${r.difficulty}</span>` : ""}
+      </div>
+      <h3>${escapeHtml(r.name)}</h3>
+      <div class="meta">⏱ ~${r.time || "?"} นาที · วัตถุดิบ ${r.ingredients.length} อย่าง</div>
+    </div>
+  `).join("");
+});
+
+pantryGrid.addEventListener("click", e => {
+  const card = e.target.closest(".card");
+  if (!card) return;
+  const r = allRecipes.find(x => String(x.id) === card.dataset.id && Boolean(x.community) === (card.dataset.community === "1"));
+  if (r) openDetail(r);
+});
+
 // ---------- Region filters + search ----------
 document.getElementById("regionFilters").addEventListener("click", e => {
   const chip = e.target.closest(".chip");
@@ -664,17 +757,58 @@ document.getElementById("searchBox").addEventListener("input", e => {
   render();
 });
 
-// ---------- Add recipe ----------
+// ---------- Add / edit / delete recipe ----------
 const addOverlay = document.getElementById("addOverlay");
-document.getElementById("openAddBtn").onclick = () => addOverlay.classList.add("open");
-document.getElementById("cancelAddBtn").onclick = () => addOverlay.classList.remove("open");
-addOverlay.addEventListener("click", e => { if (e.target === addOverlay) addOverlay.classList.remove("open"); });
+const addForm = document.getElementById("addForm");
+let editingId = null;
 
-document.getElementById("addForm").addEventListener("submit", async e => {
+function setFormMode(editing) {
+  document.getElementById("addFormTitle").textContent = editing ? "✏️ แก้ไขสูตร" : "＋ เพิ่มสูตรใหม่แชร์ให้ทีม";
+  addForm.querySelector(".btn-primary").textContent = editing ? "บันทึกการแก้ไข" : "บันทึกสูตร";
+}
+
+document.getElementById("openAddBtn").onclick = () => { editingId = null; addForm.reset(); setFormMode(false); addOverlay.classList.add("open"); };
+document.getElementById("cancelAddBtn").onclick = () => { editingId = null; addOverlay.classList.remove("open"); };
+addOverlay.addEventListener("click", e => { if (e.target === addOverlay) { editingId = null; addOverlay.classList.remove("open"); } });
+
+function startEditRecipe(recipe) {
+  closeDetail();
+  editingId = recipe.id;
+  const f = addForm;
+  f.name.value = recipe.name;
+  f.region.value = recipe.region;
+  f.protein.value = recipe.protein;
+  f.difficulty.value = recipe.difficulty || "ปานกลาง";
+  f.time.value = recipe.time || "";
+  f.author.value = recipe.author || "";
+  f.ingredients.value = recipe.ingredients.join("\n");
+  f.steps.value = recipe.steps.join("\n");
+  setFormMode(true);
+  addOverlay.classList.add("open");
+}
+
+async function deleteRecipe(recipe) {
+  if (!confirm(`ลบสูตร "${recipe.name}" ออกจากระบบ?`)) return;
+  let ok = false;
+  try {
+    const res = await fetch(`/api/recipes/${encodeURIComponent(recipe.id)}`, { method: "DELETE" });
+    ok = res.ok;
+  } catch { /* offline */ }
+  if (!ok) {
+    const local = JSON.parse(localStorage.getItem("communityRecipes") || "[]").filter(r => r.id !== recipe.id);
+    localStorage.setItem("communityRecipes", JSON.stringify(local));
+  }
+  communityRecipes = communityRecipes.filter(r => r.id !== recipe.id);
+  rebuild();
+  closeDetail();
+  showToast(`ลบสูตร "${recipe.name}" แล้ว`);
+}
+
+addForm.addEventListener("submit", async e => {
   e.preventDefault();
   const fd = new FormData(e.target);
   const recipe = {
-    id: "c" + Date.now(),
+    id: editingId || "c" + Date.now(),
     name: fd.get("name").trim(),
     region: fd.get("region"),
     protein: fd.get("protein"),
@@ -687,10 +821,11 @@ document.getElementById("addForm").addEventListener("submit", async e => {
   };
   if (!recipe.name || !recipe.ingredients.length || !recipe.steps.length) return;
 
+  const isEdit = !!editingId;
   let saved = false;
   try {
-    const res = await fetch("/api/recipes", {
-      method: "POST",
+    const res = await fetch(isEdit ? `/api/recipes/${encodeURIComponent(editingId)}` : "/api/recipes", {
+      method: isEdit ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(recipe)
     });
@@ -698,16 +833,19 @@ document.getElementById("addForm").addEventListener("submit", async e => {
   } catch { /* server offline */ }
 
   if (!saved) {
-    const local = JSON.parse(localStorage.getItem("communityRecipes") || "[]");
-    local.push(recipe);
+    let local = JSON.parse(localStorage.getItem("communityRecipes") || "[]");
+    local = isEdit ? local.map(r => r.id === editingId ? recipe : r) : [...local, recipe];
     localStorage.setItem("communityRecipes", JSON.stringify(local));
   }
 
-  communityRecipes.push(recipe);
+  communityRecipes = isEdit
+    ? communityRecipes.map(r => r.id === editingId ? recipe : r)
+    : [...communityRecipes, recipe];
+  editingId = null;
   rebuild();
   addOverlay.classList.remove("open");
   e.target.reset();
-  showToast("บันทึกสูตร “" + recipe.name + "” เรียบร้อย 🎉");
+  showToast(isEdit ? "แก้ไขสูตร “" + recipe.name + "” แล้ว ✏️" : "บันทึกสูตร “" + recipe.name + "” เรียบร้อย 🎉");
 });
 
 function showToast(msg) {
@@ -718,6 +856,11 @@ function showToast(msg) {
 }
 
 loadCommunity();
+
+// PWA: ให้ติดหน้าจอมือถือได้ + ใช้งานออฟไลน์จากตัวล่าสุดที่เคยโหลด
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
 </script>
 </body>
 </html>
