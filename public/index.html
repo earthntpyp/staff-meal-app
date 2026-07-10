@@ -272,6 +272,7 @@
       <button class="chip" data-region="ไทย-ญี่ปุ่น">ไทย × ญี่ปุ่น</button>
       <button class="chip" data-region="น้ำพริก">🌶 น้ำพริก & เครื่องแกง</button>
       <button class="chip" data-region="ฝรั่ง">🍝 ฝรั่งง่ายๆ</button>
+      <button class="chip" data-region="ซอส">🥣 น้ำจิ้ม & ซอส</button>
     </div>
     <div class="filters" id="difficultyFilters">
       <button class="chip active" data-difficulty="ทั้งหมด">ทุกระดับ</button>
@@ -314,6 +315,7 @@
             <option value="ไทย-ญี่ปุ่น">ไทย × ญี่ปุ่น</option>
             <option value="น้ำพริก">น้ำพริก & เครื่องแกง</option>
             <option value="ฝรั่ง">ฝรั่งง่ายๆ</option>
+            <option value="ซอส">น้ำจิ้ม & ซอส</option>
           </select>
         </div>
         <div>
@@ -362,7 +364,7 @@
 
 <script src="recipes.js"></script>
 <script>
-const REGION_LABEL = { "กลาง": "ไทยภาคกลาง", "อีสาน": "อีสาน", "เหนือ": "ภาคเหนือ", "ไทย-ญี่ปุ่น": "ไทย × ญี่ปุ่น", "น้ำพริก": "น้ำพริก & เครื่องแกง", "ฝรั่ง": "ฝรั่งง่ายๆ" };
+const REGION_LABEL = { "กลาง": "ไทยภาคกลาง", "อีสาน": "อีสาน", "เหนือ": "ภาคเหนือ", "ไทย-ญี่ปุ่น": "ไทย × ญี่ปุ่น", "น้ำพริก": "น้ำพริก & เครื่องแกง", "ฝรั่ง": "ฝรั่งง่ายๆ", "ซอส": "น้ำจิ้ม & ซอส" };
 const PROTEIN_EMOJI = { "ไก่": "🐔", "หมู": "🐷", "เนื้อ": "🐮", "อื่นๆ": "🥚" };
 const DIFFICULTY_EMOJI = { "ง่าย": "🟢", "ปานกลาง": "🟡", "ยาก": "🔴" };
 
@@ -378,7 +380,14 @@ const PASTE_KEYS = [
   { key: "พริกแกง (พริก", id: 88 },
   { key: "พริกลาบ", id: 90 },
   { key: "พริกแกงส้ม", id: 85 },
-  { key: "พริกแกงเผ็ด", id: 83 }
+  { key: "พริกแกงเผ็ด", id: 83 },
+  // น้ำจิ้ม & ซอส
+  { key: "แจ่วบอง", id: 94 },
+  { key: "แจ่ว", id: 106 },
+  { key: "ซอสทาร์ทาร์", id: 118 },
+  { key: "น้ำจิ้มสุกี้", id: 109 },
+  { key: "น้ำจิ้มซีฟู้ด", id: 107 },
+  { key: "ซอสทงคัตสึ", id: 114 }
 ];
 
 function pasteFor(ingredient) {
@@ -541,7 +550,8 @@ function renderUsedIn(recipe) {
     r.ingredients.some(i => { const p = pasteFor(i); return p && p.id === recipe.id; })
   );
   if (!dishes.length) return "";
-  return `<h4>🍲 เมนูที่ใช้เครื่องแกงนี้</h4><div class="dish-links">` +
+  const heading = recipe.region === "ซอส" ? "🍲 เมนูที่เข้าคู่กับซอสนี้" : "🍲 เมนูที่ใช้เครื่องแกงนี้";
+  return `<h4>${heading}</h4><div class="dish-links">` +
     dishes.map(d => `<button class="paste-link" data-open-id="${d.id}" data-open-community="${d.community ? 1 : 0}">${escapeHtml(d.name)} →</button>`).join("") +
     `</div>`;
 }

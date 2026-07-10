@@ -29,6 +29,11 @@ class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=PUBLIC_DIR, **kwargs)
 
+    def end_headers(self):
+        # ให้ browser เช็คเวอร์ชันไฟล์ใหม่ทุกครั้ง — กันผู้ใช้ค้างสูตรเก่าหลัง deploy
+        self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
     def _send_json(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
