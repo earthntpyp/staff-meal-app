@@ -157,6 +157,15 @@
   .modal ul, .modal ol { padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-weight: 300; line-height: 1.55; }
   .modal ol li::marker { color: var(--accent); font-weight: 600; }
   .modal .close-row { display: flex; justify-content: flex-end; margin-top: 22px; }
+  .paste-link {
+    font-family: inherit; font-size: .78rem; font-weight: 500;
+    background: rgba(245,166,35,.12); color: var(--accent);
+    border: 1px solid rgba(245,166,35,.45); border-radius: 999px;
+    padding: 2px 12px; cursor: pointer; margin-left: 6px; vertical-align: middle;
+  }
+  .paste-link:hover { background: rgba(245,166,35,.28); }
+  .dish-links { display: flex; flex-wrap: wrap; gap: 8px; }
+  .dish-links .paste-link { margin-left: 0; padding: 6px 14px; font-size: .85rem; }
   .btn-secondary {
     font-family: inherit; font-size: .95rem; padding: 9px 24px; border-radius: 999px; cursor: pointer;
     background: var(--card); color: var(--text); border: 1px solid var(--line);
@@ -328,6 +337,26 @@ const REGION_LABEL = { "กลาง": "ไทยภาคกลาง", "อี
 const PROTEIN_EMOJI = { "ไก่": "🐔", "หมู": "🐷", "เนื้อ": "🐮", "อื่นๆ": "🥚" };
 const DIFFICULTY_EMOJI = { "ง่าย": "🟢", "ปานกลาง": "🟡", "ยาก": "🔴" };
 
+// จับคู่วัตถุดิบ "พริกแกง/เครื่องแกง" กับสูตรโขลกเองในแอป (คีย์เฉพาะเจาะจงต้องมาก่อน)
+const PASTE_KEYS = [
+  { key: "พริกแกงเขียวหวาน", id: 84 },
+  { key: "พริกแกงมัสมั่น", id: 86 },
+  { key: "พริกแกงแพนง", id: 87 },
+  { key: "พริกแกงฮังเล", id: 89 },
+  { key: "พริกแกงเหนือ", id: 89 },
+  { key: "พริกแกงอ่อม", id: 88 },
+  { key: "เครื่องแกงอ่อม", id: 88 },
+  { key: "พริกแกง (พริก", id: 88 },
+  { key: "พริกลาบ", id: 90 },
+  { key: "พริกแกงส้ม", id: 85 },
+  { key: "พริกแกงเผ็ด", id: 83 }
+];
+
+function pasteFor(ingredient) {
+  const hit = PASTE_KEYS.find(p => ingredient.includes(p.key));
+  return hit ? BASE_RECIPES.find(r => r.id === hit.id) : null;
+}
+
 let communityRecipes = [];
 let allRecipes = [...BASE_RECIPES];
 let activeProtein = "ทั้งหมด";
@@ -409,15 +438,43 @@ function openDetail(recipe) {
     <h2>${escapeHtml(recipe.name)}</h2>
     <div class="meta">⏱ เวลาปรุงประมาณ ${recipe.time || "?"} นาที · สัดส่วน ~5 คน${recipe.author ? " · แชร์โดย " + escapeHtml(recipe.author) : ""}</div>
     <h4>🧺 วัตถุดิบ</h4>
-    <ul>${recipe.ingredients.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>
+    <ul>${recipe.ingredients.map(i => {
+      const p = pasteFor(i);
+      const link = p && p.id !== recipe.id
+        ? ` <button class="paste-link" data-open-id="${p.id}">🌶 สูตรโขลกเอง →</button>` : "";
+      return `<li>${escapeHtml(i)}${link}</li>`;
+    }).join("")}</ul>
     <h4>👨‍🍳 วิธีทำ</h4>
     <ol>${recipe.steps.map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
+    ${renderUsedIn(recipe)}
     <div class="close-row"><button class="btn-secondary" onclick="closeDetail()">ปิด</button></div>
   `;
   detailOverlay.classList.add("open");
 }
+// สำหรับหน้าพริกแกง: รวมเมนูที่ใช้เครื่องแกงนี้ (ลิงก์ย้อนกลับ)
+function renderUsedIn(recipe) {
+  if (!recipe.paste) return "";
+  const dishes = allRecipes.filter(r =>
+    r.id !== recipe.id &&
+    r.ingredients.some(i => { const p = pasteFor(i); return p && p.id === recipe.id; })
+  );
+  if (!dishes.length) return "";
+  return `<h4>🍲 เมนูที่ใช้เครื่องแกงนี้</h4><div class="dish-links">` +
+    dishes.map(d => `<button class="paste-link" data-open-id="${d.id}" data-open-community="${d.community ? 1 : 0}">${escapeHtml(d.name)} →</button>`).join("") +
+    `</div>`;
+}
+
 function closeDetail() { detailOverlay.classList.remove("open"); }
 detailOverlay.addEventListener("click", e => { if (e.target === detailOverlay) closeDetail(); });
+
+// กดลิงก์ในหน้าสูตร → เปิดสูตรที่เกี่ยวข้องแทนที่ (พริกแกง ↔ เมนูที่ใช้)
+detailModal.addEventListener("click", e => {
+  const btn = e.target.closest("[data-open-id]");
+  if (!btn) return;
+  const wantCommunity = btn.dataset.openCommunity === "1";
+  const r = allRecipes.find(x => String(x.id) === btn.dataset.openId && Boolean(x.community) === wantCommunity);
+  if (r) { openDetail(r); detailModal.scrollIntoView({ block: "start" }); }
+});
 
 grid.addEventListener("click", e => {
   const card = e.target.closest(".card");
