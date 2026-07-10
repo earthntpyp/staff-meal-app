@@ -33,3 +33,4 @@ public/index.html    # หน้าเว็บทั้งหมด (UI + logic
 public/recipes.js    # ฐานข้อมูล 82 เมนู
 data/community.json  # สูตรที่ทีมเพิ่ม (สร้างอัตโนมัติ)
 ```
+
