@@ -1,4 +1,6 @@
-# 🍳 เมนูพนักงานวันนี้ — Staff Meal Randomizer
+# 🍳 Gin-Rai-Dee (กินไรดี??) — Staff Meal Randomizer
+
+🌐 Live: https://gin-rai-dee.up.railway.app
 
 เว็บแอปช่วยหัวหน้าครัว/เชฟ ที่นึกเมนูอาหารพนักงาน (staff meal) ไม่ออก
 
